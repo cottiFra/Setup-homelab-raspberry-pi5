@@ -1,90 +1,69 @@
-# Homelab Setup — Raspberry Pi 5
+# HomeLab Setup — Command Reference
 
-Documentation tracking by cottiFra. Built on a Raspberry Pi 5 infrastructure.
+> Copy and paste these commands sequentially on your Raspberry Pi via SSH.
 
 ---
 
-## Phase 3: Installing Docker & Docker Compose
-
-To run all services in an isolated, lightweight, and easily reproducible environment, Docker was installed along with the Docker Compose plugin.
-
-### Automated Installation Script
-
-The cleanest way to install Docker on Raspberry Pi OS is by using the official convenience script provided by Docker:
-
 ```bash
-# Download the official Docker setup script
+# -------------------------
+# PHASE 2 — Initial Setup
+# -------------------------
+
+# Verify network IP
+hostname -I
+
+# Update the system
+sudo apt update && sudo apt upgrade -y
+
+# -------------------------
+# PHASE 3 — Docker
+# -------------------------
+
+# Download and run the official Docker install script
 curl -fsSL https://get.docker.com -o get-docker.sh
-
-# Execute the script to install Docker
 sudo sh get-docker.sh
-```
 
-### Managing Docker as a Non-Root User
-
-To avoid typing `sudo` before every Docker command, the main user (`cotti`) was added to the `docker` group:
-
-```bash
+# Add user to the docker group (re-login required after this)
 sudo usermod -aG docker $USER
-```
 
-> **Note:** You must log out and log back in (or restart your SSH session) for this change to take effect.
+# Apply group change without re-logging
+newgrp docker
 
----
+# Verify installation
+docker --version
+docker compose version
 
-## Phase 4: Setting Up Cloudflare Tunnels (Zero Trust)
+# -------------------------
+# PHASE 4 — Cloudflare Tunnel
+# -------------------------
 
-Instead of opening ports on the home router and exposing the home IP address to the public internet, a Cloudflare Tunnel was deployed to securely route external traffic to local services.
-
-### Homelab Directory Structure
-
-A centralized directory was created to keep all configuration files neatly organized:
-
-```bash
+# Create homelab directory
 mkdir -p ~/homelab
-```
 
-### Launching the Cloudflare Connector
-
-The tunnel daemon (`cloudflared`) is deployed as a detached container that automatically restarts if the Raspberry Pi reboots:
-
-```bash
+# Start the Cloudflare tunnel connector
 docker run -d \
   --name cloudflare-tunnel \
   --restart unless-stopped \
   cloudflare/cloudflared:latest tunnel \
-  --no-autoupdate run --token 
-```
+  --no-autoupdate run --token <YOUR_CLOUDFLARE_TOKEN>
 
----
+# -------------------------
+# PHASE 5 — Nextcloud
+# -------------------------
 
-## Phase 5: Deploying Web Services
-
-Every service is managed via its own dedicated `docker-compose.yml` file.
-
-### Nextcloud — Private Cloud Hub
-
-| Property | Value |
-|---|---|
-| Internal Port | `8080` |
-| Public Domain | `https://cloud.cottihomelab.uk` |
-
-```bash
 cd ~/homelab/nextcloud
 docker compose up -d
 
-# Fix trusted domains to allow the Cloudflare URL
+# Fix trusted domains
 docker compose exec --user www-data app php occ config:system:set trusted_domains 2 --value=cloud.cottihomelab.uk
-```
 
-### Unibank — Custom PHP/HTML/CSS Website
+# Verify trusted domains
+docker compose exec --user www-data app php occ config:system:get trusted_domains
 
-| Property | Value |
-|---|---|
-| Internal Port | `8081` |
-| Public Domain | `https://unibank.cottihomelab.uk` |
+# -------------------------
+# PHASE 5 — Unibank
+# -------------------------
 
-```bash
 mkdir -p ~/homelab/unibank/html
 cd ~/homelab/unibank
 docker compose up -d
